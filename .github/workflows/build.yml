@@ -18,20 +18,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Extract ORISON source archive
+        run: |
+          mkdir -p orison-source
+          unzip -q DeS-ORISON-plugin-source.zip -d orison-source
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-          cache: maven
+
+      - name: Locate Maven project
+        run: |
+          POM="$(find orison-source -type f -name pom.xml -print -quit)"
+          if [ -z "$POM" ]; then
+            echo "::error::No pom.xml found in source ZIP"
+            find orison-source -maxdepth 4 -type f
+            exit 1
+          fi
+          echo "POM=$POM" >> "$GITHUB_ENV"
+          echo "JAR_PATH=$(dirname "$POM")/target/orison-1.0.0.jar" >> "$GITHUB_ENV"
 
       - name: Build ORISON standalone plugin
-        run: mvn -B -ntp -Pstandalone clean package
+        run: mvn -B -ntp -f "$POM" -Pstandalone clean package
 
       - name: Upload ORISON JAR
         uses: actions/upload-artifact@v4
         with:
           name: DeS-ORISON
-          path: target/orison-1.0.0.jar
+          path: ${{ env.JAR_PATH }}
           if-no-files-found: error
-          
