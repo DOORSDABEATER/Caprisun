@@ -4,7 +4,7 @@ name: Build ORISON Plugin
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -23,24 +23,40 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Extract ORISON Source
+        run: |
+          ZIP=$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "ERROR: Source ZIP not found!"
+            exit 1
+          fi
+
+          echo "Extracting $ZIP"
+          mkdir -p extracted
+          unzip -q "$ZIP" -d extracted
+
       - name: Locate Maven Project
         id: project
         run: |
-          POM=$(find . -name pom.xml -not -path '*/.git/*' | head -n 1)
+          POM=$(find extracted -name pom.xml | head -n 1)
+
           if [ -z "$POM" ]; then
-            echo "ERROR: No pom.xml found!"
+            echo "ERROR: pom.xml not found!"
             exit 1
           fi
+
           echo "pom=$POM" >> "$GITHUB_OUTPUT"
-          echo "Found Maven project: $POM"
 
       - name: Build ORISON
-        run: mvn -B -f "${{ steps.project.outputs.pom }}" -Pstandalone clean package
+        run: |
+          mvn -B -f "${{ steps.project.outputs.pom }}" \
+            -Pstandalone clean package
 
       - name: Upload Plugin JAR
         uses: actions/upload-artifact@v4
         with:
           name: ORISON-Plugin
-          path: '**/target/*.jar'
+          path: extracted/**/target/*.jar
           if-no-files-found: error
           
